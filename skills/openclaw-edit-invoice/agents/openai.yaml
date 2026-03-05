@@ -1,0 +1,3 @@
+display_name: Edit Invoice
+short_description: Confirm changes with the user and update today's invoice entry.
+default_prompt: Update today's existing invoice entry after confirming replacement hours and description on Telegram, and invoking the local executor in edit mode.

@@ -1,0 +1,30 @@
+{
+  "name": "invoice-portal-automation",
+  "version": "1.0.0",
+  "description": "Headless invoice portal executor invoked by OpenClaw",
+  "main": "dist/index.js",
+  "scripts": {
+    "build": "tsc",
+    "dev": "ts-node src/index.ts",
+    "invoice": "npm run build && node dist/index.js",
+    "invoice:edit": "npm run build && node dist/index.js edit",
+    "test:portal": "ts-node src/portal/browser.ts"
+  },
+  "dependencies": {
+    "dotenv": "^16.3.0",
+    "playwright": "^1.40.0"
+  },
+  "devDependencies": {
+    "@types/node": "^20.0.0",
+    "ts-node": "^10.9.0",
+    "typescript": "^5.3.0"
+  },
+  "keywords": [
+    "automation",
+    "invoice",
+    "openclaw",
+    "playwright"
+  ],
+  "author": "Dani",
+  "license": "MIT"
+}

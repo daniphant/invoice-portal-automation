@@ -1,0 +1,13 @@
+.env
+.env.*
+!.env.example
+
+node_modules/
+dist/
+artifacts/
+*.log
+*.png
+
+.DS_Store
+.playwright/
+playwright-report/
