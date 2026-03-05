@@ -8,6 +8,7 @@
     "dev": "ts-node src/index.ts",
     "invoice": "npm run build && node dist/index.js",
     "invoice:edit": "npm run build && node dist/index.js edit",
+    "test": "vitest run",
     "test:portal": "ts-node src/portal/browser.ts"
   },
   "dependencies": {
@@ -17,7 +18,8 @@
   "devDependencies": {
     "@types/node": "^20.0.0",
     "ts-node": "^10.9.0",
-    "typescript": "^5.3.0"
+    "typescript": "^5.3.0",
+    "vitest": "^3.2.4"
   },
   "keywords": [
     "automation",

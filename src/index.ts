@@ -1,29 +1,14 @@
+import {
+  type ErrorCode,
+  type ExecutionMode,
+  type InvoiceRequest,
+  ExecutorError,
+  normalizeRequest,
+  resolveMode,
+} from './cli';
 import { BrowserFlowError, PortalBrowser } from './portal/browser';
 
-type ErrorCode =
-  | 'INVALID_INPUT'
-  | 'LOGIN_FAILED'
-  | 'NAVIGATION_FAILED'
-  | 'DUPLICATE_DETECTED'
-  | 'INVOICE_NOT_FOUND'
-  | 'SUBMISSION_FAILED'
-  | 'UNEXPECTED_ERROR';
-
-type ExecutionMode = 'create' | 'edit';
-
-interface InvoiceRequest {
-  hours: number | string;
-  description: string;
-  dryRun?: boolean;
-}
-
-interface NormalizedInvoiceRequest {
-  hours: string;
-  description: string;
-  dryRun: boolean;
-}
-
-interface SuccessResult {
+type SuccessResult = {
   ok: true;
   mode: ExecutionMode;
   dryRun: boolean;
@@ -32,104 +17,17 @@ interface SuccessResult {
   submittedAt: string;
   screenshotPath?: string;
   currentUrl?: string;
-}
+};
 
-interface FailureResult {
+type FailureResult = {
   ok: false;
   errorCode: ErrorCode;
   message: string;
   screenshotPath?: string;
   currentUrl?: string;
-}
+};
 
-class ExecutorError extends Error {
-  constructor(
-    public readonly code: ErrorCode,
-    message: string,
-  ) {
-    super(message);
-    this.name = 'ExecutorError';
-  }
-}
-
-function formatDecimalHours(raw: number): string {
-  if (!Number.isFinite(raw) || raw <= 0) {
-    throw new ExecutorError('INVALID_INPUT', 'Hours must be a positive number.');
-  }
-
-  const totalMinutes = Math.round(raw * 60);
-  const hours = Math.floor(totalMinutes / 60);
-  const minutes = totalMinutes % 60;
-
-  return `${String(hours).padStart(2, '0')}:${String(minutes).padStart(2, '0')}`;
-}
-
-function normalizeHours(raw: number | string): string {
-  if (typeof raw === 'number') {
-    return formatDecimalHours(raw);
-  }
-
-  const trimmed = raw.trim();
-  if (!trimmed) {
-    throw new ExecutorError('INVALID_INPUT', 'Hours are required.');
-  }
-
-  const hhmmMatch = trimmed.match(/^(\d{1,2}):(\d{2})$/);
-  if (hhmmMatch) {
-    const hours = Number(hhmmMatch[1]);
-    const minutes = Number(hhmmMatch[2]);
-
-    if (minutes >= 60 || hours < 0 || (hours === 0 && minutes === 0)) {
-      throw new ExecutorError('INVALID_INPUT', 'Hours must be greater than zero.');
-    }
-
-    return `${String(hours).padStart(2, '0')}:${String(minutes).padStart(2, '0')}`;
-  }
-
-  const numericHours = Number(trimmed);
-  if (!Number.isNaN(numericHours)) {
-    return formatDecimalHours(numericHours);
-  }
-
-  throw new ExecutorError(
-    'INVALID_INPUT',
-    'Hours must be a number like 8 or 8.5, or a string like 08:30.',
-  );
-}
-
-function normalizeRequest(payload: InvoiceRequest): NormalizedInvoiceRequest {
-  if (!payload || typeof payload !== 'object') {
-    throw new ExecutorError('INVALID_INPUT', 'Input must be a JSON object.');
-  }
-
-  if (typeof payload.description !== 'string' || !payload.description.trim()) {
-    throw new ExecutorError('INVALID_INPUT', 'Description is required.');
-  }
-
-  return {
-    hours: normalizeHours(payload.hours),
-    description: payload.description.trim(),
-    dryRun: payload.dryRun === true,
-  };
-}
-
-function resolveMode(argv: string[]): ExecutionMode {
-  const mode = argv[2];
-  if (!mode || mode === 'create') {
-    return 'create';
-  }
-
-  if (mode === 'edit') {
-    return 'edit';
-  }
-
-  throw new ExecutorError(
-    'INVALID_INPUT',
-    'Unknown execution mode. Use the default create mode or pass "edit".',
-  );
-}
-
-async function readStdin(): Promise<string> {
+const readStdin = async (): Promise<string> => {
   const chunks: Buffer[] = [];
 
   for await (const chunk of process.stdin) {
@@ -137,9 +35,9 @@ async function readStdin(): Promise<string> {
   }
 
   return Buffer.concat(chunks).toString('utf8').trim();
-}
+};
 
-async function main() {
+const main = async () => {
   const browser = new PortalBrowser();
   let screenshotPath: string | undefined;
   let currentUrl: string | undefined;
@@ -207,6 +105,6 @@ async function main() {
   } finally {
     await browser.close();
   }
-}
+};
 
 main();
