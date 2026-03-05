@@ -4,6 +4,8 @@ import {
   formatDecimalHours,
   normalizeHours,
   normalizeRequest,
+  parseCliOptions,
+  resolveRequestPayload,
   resolveMode,
 } from '../src/cli';
 
@@ -67,5 +69,88 @@ describe('resolveMode', () => {
 
   it('rejects unknown modes', () => {
     expect(() => resolveMode(['node', 'dist/index.js', 'unknown'])).toThrowError(ExecutorError);
+  });
+});
+
+describe('parseCliOptions', () => {
+  it('parses human-friendly flags', () => {
+    expect(parseCliOptions([
+      'node',
+      'dist/index.js',
+      '--hours',
+      '8.5',
+      '--description',
+      'Human entry',
+      '--dry-run',
+    ])).toEqual({
+      hours: '8.5',
+      description: 'Human entry',
+      dryRun: true,
+    });
+  });
+
+  it('ignores the positional execution mode', () => {
+    expect(parseCliOptions([
+      'node',
+      'dist/index.js',
+      'edit',
+      '--hours',
+      '8',
+      '--description',
+      'Updated entry',
+    ])).toEqual({
+      hours: '8',
+      description: 'Updated entry',
+    });
+  });
+
+  it('rejects a missing flag value', () => {
+    expect(() => parseCliOptions([
+      'node',
+      'dist/index.js',
+      '--hours',
+    ])).toThrowError(ExecutorError);
+  });
+});
+
+describe('resolveRequestPayload', () => {
+  it('accepts stdin-only payloads', () => {
+    expect(resolveRequestPayload({}, {
+      hours: '8',
+      description: 'stdin payload',
+    })).toEqual({
+      hours: '8',
+      description: 'stdin payload',
+    });
+  });
+
+  it('accepts cli-only payloads', () => {
+    expect(resolveRequestPayload({
+      hours: '8',
+      description: 'cli payload',
+      dryRun: true,
+    })).toEqual({
+      hours: '8',
+      description: 'cli payload',
+      dryRun: true,
+    });
+  });
+
+  it('lets cli flags override stdin values', () => {
+    expect(resolveRequestPayload({
+      description: 'cli payload',
+    }, {
+      hours: '8',
+      description: 'stdin payload',
+      dryRun: false,
+    })).toEqual({
+      hours: '8',
+      description: 'cli payload',
+      dryRun: false,
+    });
+  });
+
+  it('rejects missing input from both sources', () => {
+    expect(() => resolveRequestPayload({})).toThrowError(ExecutorError);
   });
 });

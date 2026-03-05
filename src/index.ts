@@ -1,9 +1,12 @@
 import {
+  type CliOptions,
   type ErrorCode,
   type ExecutionMode,
   type InvoiceRequest,
   ExecutorError,
+  parseCliOptions,
   normalizeRequest,
+  resolveRequestPayload,
   resolveMode,
 } from './cli';
 import { BrowserFlowError, PortalBrowser } from './portal/browser';
@@ -37,6 +40,19 @@ const readStdin = async (): Promise<string> => {
   return Buffer.concat(chunks).toString('utf8').trim();
 };
 
+const readStdinPayload = async (): Promise<InvoiceRequest | undefined> => {
+  if (process.stdin.isTTY) {
+    return undefined;
+  }
+
+  const input = await readStdin();
+  if (!input) {
+    return undefined;
+  }
+
+  return JSON.parse(input) as InvoiceRequest;
+};
+
 const main = async () => {
   const browser = new PortalBrowser();
   let screenshotPath: string | undefined;
@@ -44,12 +60,9 @@ const main = async () => {
 
   try {
     const mode = resolveMode(process.argv);
-    const input = await readStdin();
-    if (!input) {
-      throw new ExecutorError('INVALID_INPUT', 'Expected JSON payload on stdin.');
-    }
-
-    const request = normalizeRequest(JSON.parse(input) as InvoiceRequest);
+    const cliOptions: CliOptions = parseCliOptions(process.argv);
+    const stdinPayload = await readStdinPayload();
+    const request = normalizeRequest(resolveRequestPayload(cliOptions, stdinPayload));
 
     await browser.launch();
     await browser.login();

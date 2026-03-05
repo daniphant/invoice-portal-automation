@@ -21,6 +21,12 @@ export type NormalizedInvoiceRequest = {
   dryRun: boolean;
 };
 
+export type CliOptions = {
+  hours?: string;
+  description?: string;
+  dryRun?: boolean;
+};
+
 export class ExecutorError extends Error {
   constructor(
     public readonly code: ErrorCode,
@@ -93,7 +99,18 @@ export const normalizeRequest = (payload: InvoiceRequest): NormalizedInvoiceRequ
 };
 
 export const resolveMode = (argv: string[]): ExecutionMode => {
-  const mode = argv[2];
+  const firstPositional = argv
+    .slice(2)
+    .find((argument, index, allArguments) => {
+      if (argument.startsWith('--')) {
+        return false;
+      }
+
+      const previousArgument = allArguments[index - 1];
+      return previousArgument !== '--hours' && previousArgument !== '--description';
+    });
+
+  const mode = firstPositional;
   if (!mode || mode === 'create') {
     return 'create';
   }
@@ -106,4 +123,68 @@ export const resolveMode = (argv: string[]): ExecutionMode => {
     'INVALID_INPUT',
     'Unknown execution mode. Use the default create mode or pass "edit".',
   );
+};
+
+export const parseCliOptions = (argv: string[]): CliOptions => {
+  const options: CliOptions = {};
+  const args = argv.slice(2).filter((argument) => argument !== 'create' && argument !== 'edit');
+
+  for (let index = 0; index < args.length; index += 1) {
+    const argument = args[index];
+
+    if (argument === '--dry-run') {
+      options.dryRun = true;
+      continue;
+    }
+
+    if (argument === '--hours' || argument === '--description') {
+      const value = args[index + 1];
+      if (!value || value.startsWith('--')) {
+        throw new ExecutorError('INVALID_INPUT', `Missing value for ${argument}.`);
+      }
+
+      if (argument === '--hours') {
+        options.hours = value;
+      } else {
+        options.description = value;
+      }
+
+      index += 1;
+      continue;
+    }
+
+    throw new ExecutorError('INVALID_INPUT', `Unknown argument: ${argument}`);
+  }
+
+  return options;
+};
+
+export const resolveRequestPayload = (
+  cliOptions: CliOptions,
+  stdinPayload?: InvoiceRequest,
+): InvoiceRequest => {
+  const payload: Partial<InvoiceRequest> = stdinPayload && typeof stdinPayload === 'object'
+    ? { ...stdinPayload }
+    : {};
+
+  if (cliOptions.hours !== undefined) {
+    payload.hours = cliOptions.hours;
+  }
+
+  if (cliOptions.description !== undefined) {
+    payload.description = cliOptions.description;
+  }
+
+  if (cliOptions.dryRun !== undefined) {
+    payload.dryRun = cliOptions.dryRun;
+  }
+
+  if (Object.keys(payload).length === 0) {
+    throw new ExecutorError(
+      'INVALID_INPUT',
+      'Provide invoice input through JSON stdin or --hours/--description flags.',
+    );
+  }
+
+  return payload as InvoiceRequest;
 };
