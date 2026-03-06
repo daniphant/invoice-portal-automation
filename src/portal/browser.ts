@@ -10,15 +10,15 @@ type ErrorCode =
   | 'INVOICE_NOT_FOUND'
   | 'SUBMISSION_FAILED';
 
-interface InvoiceRequest {
+type InvoiceRequest = {
   hours: string;
   description: string;
   dryRun: boolean;
-}
+};
 
-interface ExecutionResult {
+type ExecutionResult = {
   dryRun: boolean;
-}
+};
 
 export class BrowserFlowError extends Error {
   constructor(
@@ -52,6 +52,7 @@ const LABELS = {
 const ACTION_MATCHERS = {
   create: /Create Invoice/i,
   save: /Save Invoice/i,
+  savePending: /Saving/i,
 } as const;
 
 export class PortalBrowser {
@@ -104,8 +105,7 @@ export class PortalBrowser {
     await page.goto(this.buildUrl(ROUTES.records), {
       waitUntil: 'domcontentloaded',
     });
-
-    await page.getByRole('heading', { name: LABELS.recordsHeading }).waitFor();
+    await this.waitForRecordsPageReady();
 
     const rows = page.locator('table tbody tr');
     const rowCount = await rows.count();
@@ -151,7 +151,7 @@ export class PortalBrowser {
       await page.getByRole('textbox', { name: LABELS.entryRate }).waitFor();
 
       await page.getByRole('textbox', { name: LABELS.entryHours }).fill(request.hours);
-      await page.getByRole('textbox', { name: LABELS.entryNotes }).fill(request.description);
+      await this.fillNotesField(request.description);
 
       if (request.dryRun) {
         return { dryRun: true };
@@ -177,22 +177,20 @@ export class PortalBrowser {
   async editInvoice(request: InvoiceRequest): Promise<ExecutionResult> {
     const page = this.getPage();
     const recordUrl = await this.openInvoiceForToday();
+    const saveButton = page.getByRole('button', { name: ACTION_MATCHERS.save });
 
     try {
       await page.getByRole('heading', { name: LABELS.editHeading }).waitFor();
       await page.getByRole('textbox', { name: LABELS.entryHours }).fill(request.hours);
-      await page.getByRole('textbox', { name: LABELS.entryNotes }).fill(request.description);
+      await this.fillNotesField(request.description);
 
       if (request.dryRun) {
         return { dryRun: true };
       }
 
-      await page.getByRole('button', { name: ACTION_MATCHERS.save }).click();
-
-      await Promise.race([
-        page.waitForURL(recordUrl),
-        page.waitForSelector(`text=${LABELS.editHeading}`),
-      ]);
+      await saveButton.click();
+      await this.waitForEditSubmission(recordUrl);
+      await this.verifyPersistedInvoice(request, recordUrl);
 
       return { dryRun: false };
     } catch (error) {
@@ -248,8 +246,7 @@ export class PortalBrowser {
     await page.goto(this.buildUrl(ROUTES.records), {
       waitUntil: 'domcontentloaded',
     });
-
-    await page.getByRole('heading', { name: LABELS.recordsHeading }).waitFor();
+    await this.waitForRecordsPageReady();
 
     const rows = page.locator('table tbody tr');
     const rowCount = await rows.count();
@@ -278,6 +275,127 @@ export class PortalBrowser {
     return this.normalizeText(description) === this.normalizeText(request.description)
       && this.normalizeText(hours) === this.normalizeText(request.hours);
   }
+
+  private waitForEditSubmission = async (recordUrl: string): Promise<void> => {
+    const page = this.getPage();
+    const savingButton = page.getByRole('button', { name: ACTION_MATCHERS.savePending });
+
+    try {
+      await savingButton.waitFor({ state: 'visible', timeout: 2_000 });
+      await Promise.race([
+        savingButton.waitFor({ state: 'hidden', timeout: CONFIG.actionTimeoutMs }),
+        page.waitForURL(recordUrl, { timeout: CONFIG.actionTimeoutMs }),
+        page.waitForURL(`**${ROUTES.records}`, { timeout: CONFIG.actionTimeoutMs }),
+      ]);
+    } catch {
+      // Some runs may never swap the label to "Saving"; fall back to navigation/button checks.
+    }
+
+    if (page.url().includes(ROUTES.records) || page.url() === recordUrl) {
+      return;
+    }
+
+    const saveButton = page.getByRole('button', { name: ACTION_MATCHERS.save });
+    try {
+      await saveButton.waitFor({ state: 'visible', timeout: 2_000 });
+      await this.waitForButtonEnabled(saveButton);
+      return;
+    } catch {
+      throw new BrowserFlowError(
+        'SUBMISSION_FAILED',
+        'The save action did not reach a verifiable completion state.',
+      );
+    }
+  };
+
+  private verifyPersistedInvoice = async (
+    request: InvoiceRequest,
+    recordUrl: string,
+  ): Promise<void> => {
+    const page = this.getPage();
+
+    await page.goto(recordUrl, {
+      waitUntil: 'domcontentloaded',
+    });
+    await page.getByRole('heading', { name: LABELS.editHeading }).waitFor();
+    await this.waitForInvoiceFormToHydrate();
+
+    const matches = await this.invoiceMatches(request);
+    if (!matches) {
+      throw new BrowserFlowError(
+        'SUBMISSION_FAILED',
+        'The portal did not persist the updated invoice values.',
+      );
+    }
+  };
+
+  private fillNotesField = async (description: string): Promise<void> => {
+    const notes = this.getPage().getByRole('textbox', { name: LABELS.entryNotes });
+    await notes.fill(description);
+    await notes.press('Tab');
+  };
+
+  private waitForButtonEnabled = async (button: Locator): Promise<void> => {
+    const deadline = Date.now() + CONFIG.actionTimeoutMs;
+
+    while (Date.now() < deadline) {
+      if (await button.isVisible() && !(await button.isDisabled())) {
+        return;
+      }
+
+      await this.getPage().waitForTimeout(250);
+    }
+
+    throw new BrowserFlowError(
+      'SUBMISSION_FAILED',
+      'The save action did not settle before the timeout.',
+    );
+  };
+
+  private waitForRecordsPageReady = async (): Promise<void> => {
+    const page = this.getPage();
+    await page.getByRole('heading', { name: LABELS.recordsHeading }).waitFor();
+
+    try {
+      await page.waitForLoadState('networkidle', { timeout: CONFIG.actionTimeoutMs });
+    } catch {
+      // The page can keep background requests alive; continue with row polling.
+    }
+
+    const rows = page.locator('table tbody tr');
+    const deadline = Date.now() + CONFIG.actionTimeoutMs;
+
+    while (Date.now() < deadline) {
+      if (await rows.count()) {
+        return;
+      }
+
+      await page.waitForTimeout(250);
+    }
+  };
+
+  private waitForInvoiceFormToHydrate = async (): Promise<void> => {
+    const page = this.getPage();
+    const hoursInput = page.getByRole('textbox', { name: LABELS.entryHours });
+    const descriptionInput = page.getByRole('textbox', { name: LABELS.entryNotes });
+    const deadline = Date.now() + CONFIG.actionTimeoutMs;
+
+    while (Date.now() < deadline) {
+      const hoursValue = await hoursInput.inputValue();
+      const descriptionValue = await descriptionInput.inputValue();
+
+      if (hoursValue.trim() || descriptionValue.trim()) {
+        return;
+      }
+
+      await page.waitForTimeout(250);
+    }
+
+    throw new BrowserFlowError(
+      'SUBMISSION_FAILED',
+      'The invoice form did not finish loading before verification.',
+    );
+  };
 
   private buildUrl(pathname: string): string {
     return new URL(pathname, CONFIG.portal.baseUrl).toString();
