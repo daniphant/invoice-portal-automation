@@ -188,7 +188,12 @@ export class PortalBrowser {
         return { dryRun: true };
       }
 
+      const saveResponsePromise = page.waitForResponse(
+        (res) => res.request().method() === 'PUT',
+        { timeout: 15_000 },
+      );
       await saveButton.click();
+      await saveResponsePromise;
       await this.waitForEditSubmission(recordUrl);
       await this.verifyPersistedInvoice(request, recordUrl);
 

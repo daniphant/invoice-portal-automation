@@ -6,8 +6,8 @@
   "scripts": {
     "build": "tsc",
     "dev": "ts-node src/index.ts",
-    "invoice": "npm run build && node dist/index.js",
-    "invoice:edit": "npm run build && node dist/index.js edit",
+    "invoice": "tsc && node dist/index.js",
+    "invoice:edit": "tsc && node dist/index.js edit",
     "test": "vitest run",
     "test:portal": "ts-node src/portal/browser.ts",
     "test:clickup": "ts-node src/test-clickup.ts"
