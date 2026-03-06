@@ -319,14 +319,7 @@ export class PortalBrowser {
     });
     await page.getByRole('heading', { name: LABELS.editHeading }).waitFor();
     await this.waitForInvoiceFormToHydrate();
-
-    const matches = await this.invoiceMatches(request);
-    if (!matches) {
-      throw new BrowserFlowError(
-        'SUBMISSION_FAILED',
-        'The portal did not persist the updated invoice values.',
-      );
-    }
+    await this.waitForPersistedInvoiceMatch(request);
   };
 
   private fillNotesField = async (description: string): Promise<void> => {
@@ -394,6 +387,27 @@ export class PortalBrowser {
     throw new BrowserFlowError(
       'SUBMISSION_FAILED',
       'The invoice form did not finish loading before verification.',
+    );
+  };
+
+  private waitForPersistedInvoiceMatch = async (request: InvoiceRequest): Promise<void> => {
+    const page = this.getPage();
+    const deadline = Date.now() + CONFIG.actionTimeoutMs;
+
+    while (Date.now() < deadline) {
+      if (await this.invoiceMatches(request)) {
+        return;
+      }
+
+      await page.waitForTimeout(500);
+      await page.reload({ waitUntil: 'domcontentloaded' });
+      await page.getByRole('heading', { name: LABELS.editHeading }).waitFor();
+      await this.waitForInvoiceFormToHydrate();
+    }
+
+    throw new BrowserFlowError(
+      'SUBMISSION_FAILED',
+      'The portal did not persist the updated invoice values.',
     );
   };
 
