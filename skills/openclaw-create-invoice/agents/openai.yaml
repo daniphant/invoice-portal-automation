@@ -1,3 +1,3 @@
 display_name: Create Invoice
 short_description: Confirm tasks with the user and create today's invoice entry.
-default_prompt: Create today's invoice entry after summarizing in-progress ClickUp work, confirming hours and description on Telegram, and invoking the local executor in create mode.
+default_prompt: Create today's invoice entry after summarizing in-progress ClickUp work through the ClickUp My Work API, confirming hours and description on Telegram, and invoking the local executor in create mode.

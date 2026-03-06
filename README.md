@@ -4,14 +4,14 @@ Headless Playwright executor for creating or editing invoice entries in a privat
 
 This repository is intentionally narrow:
 
-- OpenClaw handles scheduling, ClickUp MCP lookups, Telegram messaging, and user confirmation.
+- OpenClaw handles scheduling, ClickUp API lookups, Telegram messaging, and user confirmation.
 - This repository accepts normalized invoice input, runs the browser flow, and returns structured JSON on `stdout`.
 
 ## Requirements
 
 - Node.js 20+
 - npm
-- Valid portal credentials in `.env`
+- Valid ClickUp API and portal credentials in `.env`
 
 ## Setup
 
@@ -21,9 +21,13 @@ This repository is intentionally narrow:
 npm install
 ```
 
-2. Create `.env` from `.env.example` and fill in the portal credentials:
+2. Create `.env` from `.env.example` and fill in the ClickUp and portal credentials:
 
 ```bash
+CLICKUP_API_TOKEN=your_clickup_api_token
+CLICKUP_TEAM_ID=your_clickup_team_id
+CLICKUP_USER_ID=your_clickup_user_id
+
 PORTAL_EMAIL=user@example.com
 PORTAL_PASSWORD=supersecret
 PORTAL_BASE_URL=https://example.com/
@@ -41,7 +45,8 @@ OpenClaw should treat this repository as an executor, not as the orchestration l
 
 OpenClaw is expected to:
 
-- query ClickUp through MCP,
+- query ClickUp through the API,
+- use the ClickUp My Work API to collect the user’s active items,
 - summarize relevant work,
 - ask the user on Telegram whether to create or edit,
 - confirm the final hours and description,

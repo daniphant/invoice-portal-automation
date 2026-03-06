@@ -9,9 +9,11 @@
     "invoice": "npm run build && node dist/index.js",
     "invoice:edit": "npm run build && node dist/index.js edit",
     "test": "vitest run",
-    "test:portal": "ts-node src/portal/browser.ts"
+    "test:portal": "ts-node src/portal/browser.ts",
+    "test:clickup": "ts-node src/test-clickup.ts"
   },
   "dependencies": {
+    "axios": "^1.13.6",
     "dotenv": "^16.3.0",
     "playwright": "^1.40.0"
   },

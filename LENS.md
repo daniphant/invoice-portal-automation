@@ -4,14 +4,14 @@
 
 This repository is a narrow executor for invoice creation and invoice editing inside a private web portal.
 
-OpenClaw owns the schedule, ClickUp MCP access, Telegram conversation, and confirmation flow. This repository only receives confirmed invoice input, opens the portal in Playwright headless mode, and performs the requested browser action.
+OpenClaw owns the schedule, ClickUp API access, Telegram conversation, and confirmation flow. This repository only receives confirmed invoice input, opens the portal in Playwright headless mode, and performs the requested browser action.
 
 ## Ownership Boundary
 
 ### OpenClaw owns
 
 - Schedule and reminders
-- ClickUp task lookup through MCP
+- ClickUp task lookup through the API
 - Telegram conversation and confirmation
 - Choosing whether to create or edit
 - Sending the final JSON payload to this executor
@@ -98,6 +98,10 @@ Expected error codes:
 ## Environment Variables
 
 ```bash
+CLICKUP_API_TOKEN=your_clickup_api_token
+CLICKUP_TEAM_ID=your_clickup_team_id
+CLICKUP_USER_ID=your_clickup_user_id
+
 PORTAL_EMAIL=user@example.com
 PORTAL_PASSWORD=supersecret
 PORTAL_BASE_URL=https://example.com/
@@ -119,7 +123,7 @@ NAVIGATION_TIMEOUT_MS=30000
 ## OpenClaw Flow
 
 1. OpenClaw runs on its own schedule.
-2. OpenClaw queries ClickUp through MCP for active or in-progress tasks.
+2. OpenClaw queries the ClickUp My Work API for active or in-progress tasks.
 3. OpenClaw asks the user on Telegram whether to create or edit today’s invoice and lets the user adjust the description or hours.
 4. OpenClaw pipes the final JSON payload into the appropriate command in this repository.
 5. This repository runs the browser flow and returns structured JSON for OpenClaw to relay back.
